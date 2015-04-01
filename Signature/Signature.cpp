@@ -3,6 +3,7 @@
 #include <exception>
 #include <memory>
 #include <sstream>
+#include <iomanip>
 
 #pragma warning(disable: 4244)
 #pragma warning(disable: 4245)
@@ -14,6 +15,7 @@
 #include "SafeThreads.h"
 
 const unsigned c_defaultThreadCount = 4u;
+const unsigned c_outputStringWidth = 16u;
 
 Signature::Signature(const std::string& inputFilePath, const std::string& outputFilePath, size_t blockSize)
 	: inputFile(inputFilePath), 
@@ -112,12 +114,11 @@ void Signature::parallelReadThread(unsigned threadNumber, unsigned threadsCount)
 
 			boost::crc_32_type result;
 			result.process_bytes(begin, nextChunkSize);
-			output.seekp((result.bit_count / 8u) * (threadNumber + (iteration * threadsCount)));
+			output.seekp(c_outputStringWidth * (threadNumber + (iteration * threadsCount)));
 
 			unsigned checksum = result.checksum();
 
-			// Binary hack (ugly one)
-			output.write(reinterpret_cast<const char*>(&checksum), result.bit_count / 8u);
+			output << std::left << std::setw(c_outputStringWidth - 1) << checksum << "\n";
 		}
 	}
 	catch (...)
