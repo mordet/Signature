@@ -82,9 +82,11 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="SafeThreads.cpp" />
     <ClCompile Include="Signature.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="SafeThreads.h" />
     <ClInclude Include="Signature.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

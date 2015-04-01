@@ -21,9 +21,15 @@
     <ClCompile Include="Signature.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="SafeThreads.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Signature.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="SafeThreads.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

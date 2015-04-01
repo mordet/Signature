@@ -3,6 +3,8 @@
 #include <vector>
 #include <limits>
 #include <exception>
+#include <memory>
+#include <sstream>
 
 #pragma warning(disable: 4244)
 #pragma warning(disable: 4245)
@@ -11,42 +13,24 @@
 #pragma warning(default: 4244)
 
 #include "Signature.h"
+#include "SafeThreads.h"
 
 const unsigned c_defaultThreadCount = 4u;
 
 Signature::Signature(const std::string& inputFilePath, const std::string& outputFilePath, size_t blockSize)
-	: inputFile(inputFilePath), inputFileLength(-1), outputFile(outputFilePath), 
-	blockSize(blockSize), threads(), terminateExecution(), exceptionMutex(), currentException()
+	: inputFile(inputFilePath), 
+	inputFileLength(getFileLength(inputFilePath)), 
+	outputFile(outputFilePath), 
+	blockSize(blockSize), terminateExecution(), exceptionMutex(), currentException()
 {
 	terminateExecution.store(false);
+	unsigned concurrency = selectThreadsCount(blockSize);
 
-	std::ifstream input(inputFilePath, std::ios::binary | std::ios::ate);
-	if (!input)
-		throw std::logic_error("input file does not exist");
-
-	inputFileLength = input.tellg();
-	if (inputFileLength <= 0)
-		throw std::logic_error("input file can't be read");
-
-	long long chunksCount = static_cast<long long>(std::ceil((double)inputFileLength / blockSize));
-	
-	unsigned concurrency = std::thread::hardware_concurrency();
-	if (0 == concurrency)
-		concurrency = c_defaultThreadCount;
-
-	if (chunksCount < std::numeric_limits<unsigned>::max())
-		concurrency = std::min(concurrency, static_cast<unsigned>(chunksCount));
-
+	std::unique_ptr<SafeThreads> threads(new SafeThreads());
 	for (unsigned i = 1u; i < concurrency; ++i)
-	{
-		threads.push_back(std::thread(&Signature::work, this, i, concurrency));
-	}
+		threads->add(std::thread(&Signature::work, this, i, concurrency));
 
 	work(0u, concurrency);
-
-	for (std::thread& thread : threads)
-		if (thread.joinable())
-			thread.join();
 
 	if (currentException)
 	{
@@ -54,13 +38,40 @@ Signature::Signature(const std::string& inputFilePath, const std::string& output
 	}
 }
 
+unsigned long long Signature::getFileLength(const std::string& fileName) const
+{
+	std::ifstream file(fileName, std::ios::binary | std::ios::ate);
+	if (!file)
+	{
+		std::ostringstream ss;
+		ss << "file \"" << fileName << "\" does not exist";
+		throw std::logic_error(ss.str());
+	}
+
+	long long fileLength = file.tellg();
+	if (fileLength < 0)
+		throw std::logic_error("input file can't be read");
+
+	return static_cast<unsigned long long>(fileLength);
+}
+
+unsigned Signature::selectThreadsCount(size_t blockSize) const
+{
+	unsigned long long chunksCount = inputFileLength / blockSize;
+	if (inputFileLength % blockSize > 0u)
+		++chunksCount;
+
+	unsigned concurrency = std::thread::hardware_concurrency();
+	if (0 == concurrency)
+		concurrency = c_defaultThreadCount;
+
+	if (chunksCount < std::numeric_limits<unsigned>::max())
+		concurrency = std::min(concurrency, static_cast<unsigned>(chunksCount));
+	return concurrency;
+}
+
 Signature::~Signature(void)
 {
-	for (std::thread& thread : threads)
-	{
-		if (thread.joinable())
-			thread.join();
-	}
 }
 
 void Signature::work(unsigned threadNumber, unsigned threadsCount)

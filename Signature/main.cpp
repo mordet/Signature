@@ -44,6 +44,7 @@ int main(int argc, char* argv[])
 		std::cout << "total duration: " << std::chrono::duration<double>(end - start).count() 
 			<< "s" << std::endl;
 		
+		return EXIT_SUCCESS;
 	}
 	catch (const std::logic_error& ex)
 	{
@@ -60,7 +61,5 @@ int main(int argc, char* argv[])
 		std::cerr << "Unknown exception: " << std::current_exception() << std::endl;
 		return EXIT_FAILURE;
 	}
-
-	return EXIT_SUCCESS;
 }
 

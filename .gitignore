@@ -87,3 +87,4 @@ Signature.sdf
 Signature.opensdf
 Debug/Signature.pdb
 *.ilk
+*.pdb

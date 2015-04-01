@@ -13,16 +13,17 @@ public:
 	~Signature();
 
 private:
-	std::vector<std::thread> threads;
-	std::string inputFile;
-	long long inputFileLength;
-	std::string outputFile;
-	size_t blockSize;
-	std::atomic_bool terminateExecution;
+	const std::string inputFile;
+	const unsigned long long inputFileLength;
+	const std::string outputFile;
+	const size_t blockSize;
 
+	std::atomic_bool terminateExecution;
 	std::mutex exceptionMutex;
 	std::exception_ptr currentException;
 
 	void work(unsigned threadNumber, unsigned threadsCount);
+	unsigned long long getFileLength(const std::string& fileName) const;
+	unsigned selectThreadsCount(size_t blockSize) const;
 };
 
