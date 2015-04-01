@@ -10,12 +10,9 @@ int main(int argc, char* argv[])
 {
 	if (argc < 3)
 	{
-		std::cerr << "Usage: Signature <input_file> <output_file> [block_size]" << std::endl;
+		std::cerr << "usage: Signature <input_file> <output_file> [block_size]" << std::endl;
 		return EXIT_FAILURE;
 	}
-
-	std::string inputFilePath(argv[1]);
-	std::string outputFilePath(argv[2]);
 
 	size_t blockSize = c_defaultBlockSize;
 	if (argc >= 4)
@@ -39,7 +36,9 @@ int main(int argc, char* argv[])
 	try
 	{
 		auto start = std::chrono::system_clock::now();
-		Signature signature(inputFilePath, outputFilePath, blockSize);
+
+		Signature signature(argv[1], argv[2], blockSize);
+
 		auto end = std::chrono::system_clock::now();
 		std::cout << "total duration: " << std::chrono::duration<double>(end - start).count() 
 			<< "s" << std::endl;
@@ -48,7 +47,7 @@ int main(int argc, char* argv[])
 	}
 	catch (const std::logic_error& ex)
 	{
-		std::cerr << "logic error: " << ex.what() << std::endl;
+		std::cerr << ex.what() << std::endl;
 		return EXIT_FAILURE;
 	}
 	catch (const std::ios_base::failure& fail)

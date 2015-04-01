@@ -84,10 +84,14 @@ void Signature::work(unsigned threadNumber, unsigned threadsCount)
 			throw std::logic_error("input file does not exist");
 
 		std::ofstream output(outputFile, std::ios::binary);
-		output.exceptions(std::ios::failbit);
 		if (!output)
-			throw std::logic_error("output file can't be opened");
-
+		{
+			std::stringstream ss;
+			ss << "output file \"" << outputFile << "\" couldn't be opened for writing";
+			throw std::logic_error(ss.str());
+		}
+		output.exceptions(std::ios::failbit);
+		
 		input.seekg(threadNumber * blockSize);
 
 		std::vector<char> data(blockSize, 0);
