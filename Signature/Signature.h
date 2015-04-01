@@ -2,7 +2,9 @@
 
 #include <string>
 #include <thread>
+#include <mutex>
 #include <vector>
+#include <atomic>
 
 class Signature
 {
@@ -16,6 +18,10 @@ private:
 	long long inputFileLength;
 	std::string outputFile;
 	size_t blockSize;
+	std::atomic_bool terminateExecution;
+
+	std::mutex exceptionMutex;
+	std::exception_ptr currentException;
 
 	void work(unsigned threadNumber, unsigned threadsCount);
 };
