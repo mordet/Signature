@@ -27,6 +27,16 @@
 *.out
 *.app
 
+# Debug and Release
+.Debug
+.Release
+Signature/Debug
+Signature/Release
+
+# Visual Studio
+*.user
+*.suo
+
 # =========================
 # Operating System Files
 # =========================
@@ -73,3 +83,7 @@ $RECYCLE.BIN/
 
 # Windows shortcuts
 *.lnk
+Signature.sdf
+Signature.opensdf
+Debug/Signature.pdb
+*.ilk
