@@ -1,6 +1,4 @@
-#include <thread>
 #include <fstream>
-#include <vector>
 #include <limits>
 #include <exception>
 #include <memory>
@@ -24,18 +22,8 @@ Signature::Signature(const std::string& inputFilePath, const std::string& output
 	blockSize(blockSize), terminateExecution(), exceptionMutex(), currentException()
 {
 	terminateExecution.store(false);
-	unsigned concurrency = selectThreadsCount(blockSize);
-
-	std::unique_ptr<SafeThreads> threads(new SafeThreads());
-	for (unsigned i = 1u; i < concurrency; ++i)
-		threads->add(std::thread(&Signature::work, this, i, concurrency));
-
-	work(0u, concurrency);
-
-	if (currentException)
-	{
-		std::rethrow_exception(currentException);
-	}
+	
+	parallelRead();
 }
 
 unsigned long long Signature::getFileLength(const std::string& fileName) const
@@ -74,7 +62,23 @@ Signature::~Signature(void)
 {
 }
 
-void Signature::work(unsigned threadNumber, unsigned threadsCount)
+void Signature::parallelRead()
+{
+	unsigned concurrency = selectThreadsCount(blockSize);
+
+	std::unique_ptr<SafeThreads> threads(new SafeThreads());
+	for (unsigned i = 1u; i < concurrency; ++i)
+		threads->add(std::thread(&Signature::parallelReadThread, this, i, concurrency));
+
+	parallelReadThread(0u, concurrency);
+
+	if (currentException)
+	{
+		std::rethrow_exception(currentException);
+	}
+}
+
+void Signature::parallelReadThread(unsigned threadNumber, unsigned threadsCount)
 {
 	try
 	{
@@ -109,7 +113,11 @@ void Signature::work(unsigned threadNumber, unsigned threadsCount)
 			boost::crc_32_type result;
 			result.process_bytes(begin, nextChunkSize);
 			output.seekp((result.bit_count / 8u) * (threadNumber + (iteration * threadsCount)));
-			output << result.checksum();
+
+			unsigned checksum = result.checksum();
+
+			// Binary hack (ugly one)
+			output.write(reinterpret_cast<const char*>(&checksum), result.bit_count / 8u);
 		}
 	}
 	catch (...)
@@ -117,5 +125,21 @@ void Signature::work(unsigned threadNumber, unsigned threadsCount)
 		terminateExecution.store(true);
 		std::unique_lock<std::mutex> lock(exceptionMutex);
 		currentException = std::current_exception();
+	}
+}
+
+void Signature::syncRead()
+{
+	unsigned concurrency = selectThreadsCount(blockSize);
+
+	std::unique_ptr<SafeThreads> threads(new SafeThreads());
+	for (unsigned i = 1u; i < concurrency; ++i)
+		threads->add(std::thread(&Signature::parallelReadThread, this, i, concurrency));
+
+	parallelReadThread(0u, concurrency);
+
+	if (currentException)
+	{
+		std::rethrow_exception(currentException);
 	}
 }

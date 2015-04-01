@@ -3,7 +3,6 @@
 #include <string>
 #include <thread>
 #include <mutex>
-#include <vector>
 #include <atomic>
 
 class Signature
@@ -22,7 +21,11 @@ private:
 	std::mutex exceptionMutex;
 	std::exception_ptr currentException;
 
-	void work(unsigned threadNumber, unsigned threadsCount);
+	void parallelRead();
+	void parallelReadThread(unsigned threadNumber, unsigned threadsCount);
+
+	void syncRead();
+
 	unsigned long long getFileLength(const std::string& fileName) const;
 	unsigned selectThreadsCount(size_t blockSize) const;
 };
