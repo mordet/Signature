@@ -14,6 +14,10 @@
 #include "Signature.h"
 #include "SafeThreads.h"
 
+#include "QueuingSystem.h"
+#include "Calculator.h"
+#include "Reporter.h"
+
 const unsigned c_defaultThreadCount = 4u;
 const unsigned c_outputStringWidth = 16u;
 
@@ -24,8 +28,6 @@ Signature::Signature(const std::string& inputFilePath, const std::string& output
 	blockSize(blockSize), terminateExecution(), exceptionMutex(), currentException()
 {
 	terminateExecution.store(false);
-	
-	parallelRead();
 }
 
 unsigned long long Signature::getFileLength(const std::string& fileName) const
@@ -45,12 +47,8 @@ unsigned long long Signature::getFileLength(const std::string& fileName) const
 	return static_cast<unsigned long long>(fileLength);
 }
 
-unsigned Signature::selectThreadsCount(size_t blockSize) const
+unsigned Signature::selectThreadsCount(unsigned long long chunksCount) const
 {
-	unsigned long long chunksCount = inputFileLength / blockSize;
-	if (inputFileLength % blockSize > 0u)
-		++chunksCount;
-
 	unsigned concurrency = std::thread::hardware_concurrency();
 	if (0 == concurrency)
 		concurrency = c_defaultThreadCount;
@@ -66,13 +64,18 @@ Signature::~Signature(void)
 
 void Signature::parallelRead()
 {
-	unsigned concurrency = selectThreadsCount(blockSize);
+    unsigned long long chunksCount = inputFileLength / blockSize;
+	if (inputFileLength % blockSize > 0u)
+		++chunksCount;
 
+    Crc32Reporter reporter(outputFile, chunksCount);
+
+    unsigned concurrency = selectThreadsCount(chunksCount);
 	std::unique_ptr<SafeThreads> threads(new SafeThreads());
 	for (unsigned i = 1u; i < concurrency; ++i)
-		threads->add(std::thread(&Signature::parallelReadThread, this, i, concurrency));
+        threads->add(std::thread(&Signature::parallelReadThread, this, i, concurrency, std::ref(reporter)));
 
-	parallelReadThread(0u, concurrency);
+	parallelReadThread(0u, concurrency, reporter);
 
 	if (currentException)
 	{
@@ -80,15 +83,15 @@ void Signature::parallelRead()
 	}
 }
 
-void Signature::parallelReadThread(unsigned threadNumber, unsigned threadsCount)
+void Signature::parallelReadThread(unsigned threadNumber, unsigned threadsCount, Crc32Reporter& reporter)
 {
 	try
 	{
 		std::ifstream input(inputFile, std::ios::binary);
-		input.exceptions(std::ios::failbit);
 		if (!input)
 			throw std::logic_error("input file does not exist");
-
+        input.exceptions(std::ios::failbit);
+        /*
 		std::ofstream output(outputFile, std::ios::binary);
 		if (!output)
 		{
@@ -97,7 +100,7 @@ void Signature::parallelReadThread(unsigned threadNumber, unsigned threadsCount)
 			throw std::logic_error(ss.str());
 		}
 		output.exceptions(std::ios::failbit);
-		
+		*/
 		input.seekg(threadNumber * blockSize);
 
 		std::vector<char> data(blockSize, 0);
@@ -114,11 +117,12 @@ void Signature::parallelReadThread(unsigned threadNumber, unsigned threadsCount)
 
 			boost::crc_32_type result;
 			result.process_bytes(begin, nextChunkSize);
-			output.seekp(c_outputStringWidth * (threadNumber + (iteration * threadsCount)));
+			//output.seekp(c_outputStringWidth * (threadNumber + (iteration * threadsCount)));
 
 			unsigned checksum = result.checksum();
 
-			output << std::left << std::setw(c_outputStringWidth - 1) << checksum << "\n";
+            reporter.postResult(threadNumber + (iteration * threadsCount), checksum);
+			//output << std::left << std::setw(c_outputStringWidth - 1) << checksum << "\n";
 		}
 	}
 	catch (...)
@@ -133,13 +137,25 @@ void Signature::syncRead()
 {
 	unsigned concurrency = selectThreadsCount(blockSize);
 
-	std::unique_ptr<SafeThreads> threads(new SafeThreads());
-	for (unsigned i = 1u; i < concurrency; ++i)
-		threads->add(std::thread(&Signature::parallelReadThread, this, i, concurrency));
+    unsigned long long chunksCount = inputFileLength / blockSize;
+	if (inputFileLength % blockSize > 0u)
+		++chunksCount;
 
-	parallelReadThread(0u, concurrency);
+    ExceptionPtr storedException;
+    std::shared_ptr<QueuingSystem> queuingSystem = std::make_shared<QueuingSystem>(inputFile, blockSize, chunksCount);
+    Crc32Reporter reporter(outputFile, chunksCount);
 
-	if (currentException)
+    std::vector<std::shared_ptr<Calculator>> calculators;
+    for (unsigned i = 0u; i < concurrency; ++i)
+        calculators.push_back(std::make_shared<Calculator>(queuingSystem, reporter, chunksCount, i, concurrency));
+        
+    std::unique_ptr<SafeThreads> threads(new SafeThreads());
+    // threads->add(std::thread(&QueuingSystem::run, queuingSystem, std::ref(storedException)));
+    for (std::shared_ptr<Calculator> calculator : calculators)
+        threads->add(std::thread(&Calculator::run, calculator, std::ref(storedException)));
+    queuingSystem->run(storedException);
+
+    if (storedException)
 	{
 		std::rethrow_exception(currentException);
 	}

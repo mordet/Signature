@@ -81,11 +81,16 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Calculator.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="SafeThreads.cpp" />
+    <ClCompile Include="QueuingSystem.cpp" />
     <ClCompile Include="Signature.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Calculator.h" />
+    <ClInclude Include="ExceptionPtr.h" />
+    <ClInclude Include="QueuingSystem.h" />
+    <ClInclude Include="Reporter.h" />
     <ClInclude Include="SafeThreads.h" />
     <ClInclude Include="Signature.h" />
   </ItemGroup>

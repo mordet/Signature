@@ -5,11 +5,16 @@
 #include <mutex>
 #include <atomic>
 
+#include "Reporter.h"
+
 class Signature
 {
 public:
 	Signature(const std::string& inputFilePath, const std::string& outputFilePath, size_t blockSize);
 	~Signature();
+
+    void parallelRead();
+    void syncRead();
 
 private:
 	const std::string inputFile;
@@ -21,12 +26,9 @@ private:
 	std::mutex exceptionMutex;
 	std::exception_ptr currentException;
 
-	void parallelRead();
-	void parallelReadThread(unsigned threadNumber, unsigned threadsCount);
-
-	void syncRead();
+    void parallelReadThread(unsigned threadNumber, unsigned threadsCount, Crc32Reporter& reporter);
 
 	unsigned long long getFileLength(const std::string& fileName) const;
-	unsigned selectThreadsCount(size_t blockSize) const;
+	unsigned selectThreadsCount(unsigned long long chunksCount) const;
 };
 
