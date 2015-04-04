@@ -88,3 +88,4 @@ Signature.opensdf
 Debug/Signature.pdb
 *.ilk
 *.pdb
+Release/output.txt

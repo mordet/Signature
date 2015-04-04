@@ -16,43 +16,35 @@
 class QueuingSystem : private boost::noncopyable
 {
 public:
-    explicit QueuingSystem(const std::string& inputFile, size_t chunkSize, unsigned long long chunksCount);
-    ~QueuingSystem(void);
-
-    void run(ExceptionPtr& exceptionPtr);
-    void asyncShutdown();
-    void postRequest(std::condition_variable& condition, std::shared_ptr<std::vector<char>> destination, unsigned long long chunkNumber, bool& done);
-
-private:
     class Request;
     typedef std::shared_ptr<Request> RequestPtr;
 
+    explicit QueuingSystem(const std::string& inputFile, size_t chunkSize, unsigned long long chunksCount, unsigned long long fileSize);
+    ~QueuingSystem(void);
+
+    void run(ExceptionPtr& exceptionPtr);
+    RequestPtr get();
+    
+private:
     std::ifstream input;
     const size_t chunkSize;
     const unsigned long long chunksCount;
+    const unsigned long long fileSize;
+    std::atomic_bool done;
 
-    std::thread thread;
-    std::atomic_bool stop;
-
-    std::mutex condMutex;
-    std::condition_variable conditional;
-
+    std::mutex conditionalMutex;
+    std::condition_variable notEmpty;
+    std::condition_variable notFull;
+    
     std::mutex queueMutex;
     std::queue<RequestPtr> queue;
 };
 
-inline void QueuingSystem::asyncShutdown()
-{
-    stop.store(true);
-}
-
 class QueuingSystem::Request : boost::noncopyable
 {
 public:
-    Request(std::condition_variable& condition, std::shared_ptr<std::vector<char>> destination, unsigned long long offset, bool& done);
+    Request(unsigned long long ordinalNumber, size_t size);
 
-    std::condition_variable& condition;
-    std::shared_ptr<std::vector<char>> destination;
-    unsigned long long offset;
-    mutable bool& done;
+    std::vector<char> destination;
+    const unsigned long long ordinalNumber;
 };

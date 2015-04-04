@@ -15,7 +15,7 @@
 #include "SafeThreads.h"
 
 #include "QueuingSystem.h"
-#include "Calculator.h"
+//#include "Calculator.h"
 #include "Reporter.h"
 
 const unsigned c_defaultThreadCount = 4u;
@@ -25,7 +25,7 @@ Signature::Signature(const std::string& inputFilePath, const std::string& output
 	: inputFile(inputFilePath), 
 	inputFileLength(getFileLength(inputFilePath)), 
 	outputFile(outputFilePath), 
-	blockSize(blockSize), terminateExecution(), exceptionMutex(), currentException()
+    blockSize(blockSize), terminateExecution(), currentException()
 {
 	terminateExecution.store(false);
 }
@@ -71,15 +71,16 @@ void Signature::parallelRead()
     Crc32Reporter reporter(outputFile, chunksCount);
 
     unsigned concurrency = selectThreadsCount(chunksCount);
+
 	std::unique_ptr<SafeThreads> threads(new SafeThreads());
 	for (unsigned i = 1u; i < concurrency; ++i)
         threads->add(std::thread(&Signature::parallelReadThread, this, i, concurrency, std::ref(reporter)));
-
-	parallelReadThread(0u, concurrency, reporter);
+	
+    parallelReadThread(0u, concurrency, reporter);
 
 	if (currentException)
 	{
-		std::rethrow_exception(currentException);
+        currentException.rethrow();
 	}
 }
 
@@ -91,16 +92,7 @@ void Signature::parallelReadThread(unsigned threadNumber, unsigned threadsCount,
 		if (!input)
 			throw std::logic_error("input file does not exist");
         input.exceptions(std::ios::failbit);
-        /*
-		std::ofstream output(outputFile, std::ios::binary);
-		if (!output)
-		{
-			std::stringstream ss;
-			ss << "output file \"" << outputFile << "\" couldn't be opened for writing";
-			throw std::logic_error(ss.str());
-		}
-		output.exceptions(std::ios::failbit);
-		*/
+ 
 		input.seekg(threadNumber * blockSize);
 
 		std::vector<char> data(blockSize, 0);
@@ -117,18 +109,12 @@ void Signature::parallelReadThread(unsigned threadNumber, unsigned threadsCount,
 
 			boost::crc_32_type result;
 			result.process_bytes(begin, nextChunkSize);
-			//output.seekp(c_outputStringWidth * (threadNumber + (iteration * threadsCount)));
-
-			unsigned checksum = result.checksum();
-
-            reporter.postResult(threadNumber + (iteration * threadsCount), checksum);
-			//output << std::left << std::setw(c_outputStringWidth - 1) << checksum << "\n";
+            reporter.postResult(threadNumber + (iteration * threadsCount), result.checksum());
 		}
 	}
 	catch (...)
 	{
 		terminateExecution.store(true);
-		std::unique_lock<std::mutex> lock(exceptionMutex);
 		currentException = std::current_exception();
 	}
 }
@@ -141,22 +127,38 @@ void Signature::syncRead()
 	if (inputFileLength % blockSize > 0u)
 		++chunksCount;
 
-    ExceptionPtr storedException;
-    std::shared_ptr<QueuingSystem> queuingSystem = std::make_shared<QueuingSystem>(inputFile, blockSize, chunksCount);
+    QueuingSystem queuingSystem(inputFile, blockSize, chunksCount, inputFileLength);
     Crc32Reporter reporter(outputFile, chunksCount);
 
-    std::vector<std::shared_ptr<Calculator>> calculators;
-    for (unsigned i = 0u; i < concurrency; ++i)
-        calculators.push_back(std::make_shared<Calculator>(queuingSystem, reporter, chunksCount, i, concurrency));
-        
     std::unique_ptr<SafeThreads> threads(new SafeThreads());
-    // threads->add(std::thread(&QueuingSystem::run, queuingSystem, std::ref(storedException)));
-    for (std::shared_ptr<Calculator> calculator : calculators)
-        threads->add(std::thread(&Calculator::run, calculator, std::ref(storedException)));
-    queuingSystem->run(storedException);
+    for (unsigned i = 0; i < concurrency; ++i)
+    {
+        threads->add(std::thread(&Signature::syncReadThread, this, std::ref(queuingSystem), std::ref(reporter)));
+    }
 
-    if (storedException)
+    queuingSystem.run(currentException);
+
+    if (currentException)
 	{
-		std::rethrow_exception(currentException);
+        currentException.rethrow();
 	}
+}
+
+void Signature::syncReadThread(QueuingSystem& producer, Crc32Reporter& reporter)
+{
+    try
+    {
+        for (QueuingSystem::RequestPtr requestPtr = producer.get(); 
+            !terminateExecution.load() && requestPtr; requestPtr = producer.get())
+        {
+            boost::crc_32_type crc;
+            crc.process_bytes(&*requestPtr->destination.begin(), requestPtr->destination.size());
+            reporter.postResult(requestPtr->ordinalNumber, crc.checksum());
+        }
+    }
+    catch (...)
+    {
+        terminateExecution.store(true);
+        currentException = std::current_exception();
+    }
 }

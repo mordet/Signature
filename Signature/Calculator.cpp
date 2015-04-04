@@ -25,22 +25,16 @@ void Calculator::run(ExceptionPtr& exceptionPtr)
 {
     try
     {
-        std::mutex mutex;
-        std::shared_ptr<std::vector<char>> buffer(new std::vector<char>());
-
-        for (size_t it = ordinalNumber; !exceptionPtr && it < chunksCount; it += calculatorsCount)
+        QueuingSystem::RequestPtr requestPtr = queuingSystem->get();
+        if (requestPtr)
         {
-            {
-                bool done = false;
-                std::condition_variable conditional;
-                std::unique_lock<std::mutex> lock(mutex);
-                queuingSystem->postRequest(conditional, buffer, it, done);
-                conditional.wait(lock, [&done](){ return done; });
-            }
-
             boost::crc_32_type crc;
-            crc.process_bytes(&*buffer->begin(), buffer->size());
-            reporter.postResult(it, crc.checksum());
+            crc.process_bytes(&*requestPtr->destination.begin(), requestPtr->destination.size());
+            reporter.postResult(requestPtr->ordinalNumber, crc.checksum());
+        }
+        else
+        {
+            return;
         }
     }
     catch (...)
