@@ -38,7 +38,7 @@ int main(int argc, char* argv[])
 		auto start = std::chrono::system_clock::now();
 
 		Signature signature(argv[1], argv[2], blockSize);
-        //signature.syncRead();
+        // signature.syncRead();
         signature.parallelRead();
 
 		auto end = std::chrono::system_clock::now();

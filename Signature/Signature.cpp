@@ -121,11 +121,11 @@ void Signature::parallelReadThread(unsigned threadNumber, unsigned threadsCount,
 
 void Signature::syncRead()
 {
-	unsigned concurrency = selectThreadsCount(blockSize);
-
     unsigned long long chunksCount = inputFileLength / blockSize;
 	if (inputFileLength % blockSize > 0u)
 		++chunksCount;
+
+	unsigned concurrency = selectThreadsCount(chunksCount);
 
     QueuingSystem queuingSystem(inputFile, blockSize, chunksCount, inputFileLength);
     Crc32Reporter reporter(outputFile, chunksCount);
