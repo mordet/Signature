@@ -10,7 +10,7 @@ int main(int argc, char* argv[])
 {
 	if (argc < 3)
 	{
-		std::cerr << "usage: Signature <input_file> <output_file> [block_size]" << std::endl;
+		std::cerr << "usage: " << argv[0] << " <input_file> <output_file> [block_size]" << std::endl;
 		return EXIT_FAILURE;
 	}
 
@@ -38,13 +38,11 @@ int main(int argc, char* argv[])
 		auto start = std::chrono::system_clock::now();
 
 		Signature signature(argv[1], argv[2], blockSize);
-        // signature.syncRead();
-        signature.parallelRead();
 
 		auto end = std::chrono::system_clock::now();
 		std::cout << "total duration: " << std::chrono::duration<double>(end - start).count() 
 			<< "s" << std::endl;
-		
+
 		return EXIT_SUCCESS;
 	}
 	catch (const std::logic_error& ex)

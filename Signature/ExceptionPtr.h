@@ -7,29 +7,29 @@
 class ExceptionPtr : boost::noncopyable
 {
 public:
-    ExceptionPtr(void) {}
-    ~ExceptionPtr(void) {}
-    
-    ExceptionPtr& operator =(std::exception_ptr toStore)
-    {
-        std::unique_lock<std::mutex> lock(mutex);
-        ptr = toStore;
-        return *this;
-    };
+	ExceptionPtr() { }
+	~ExceptionPtr() { }
 
-    operator bool() const
-    {
-        return ptr;
-    }
+	ExceptionPtr& operator =(std::exception_ptr toStore)
+	{
+		std::unique_lock<std::mutex> lock(mutex);
+		ptr = toStore;
+		return *this;
+	};
 
-    void rethrow()
-    {
-        if (ptr)
-            std::rethrow_exception(ptr);
-    }
+	operator bool() const
+	{
+		return ptr;
+	}
+
+	void rethrow()
+	{
+		if (ptr)
+			std::rethrow_exception(ptr);
+	}
 
 private:
-    std::mutex mutex;
-    std::exception_ptr ptr;
+	std::mutex mutex;
+	std::exception_ptr ptr;
 };
 
